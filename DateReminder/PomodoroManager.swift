@@ -51,6 +51,7 @@ class PomodoroManager: ObservableObject {
                 }
             }
         }
+        timer?.tolerance = 0.1
         RunLoop.main.add(timer!, forMode: .common)   // keeps firing during menu interactions
     }
 
@@ -68,7 +69,7 @@ class PomodoroManager: ObservableObject {
     }
 
     // ── Private ──────────────────────────────────────────────────────
-    private func advance() {
+    func advance() {
         timer?.invalidate()
         timer     = nil
         isRunning = false

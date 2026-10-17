@@ -4,7 +4,7 @@
 import SwiftUI
 
 enum DisplayMode: String, CaseIterable, Codable {
-    case percent, days, hours
+    case percent, days, hours, tomorrow
 }
 
 struct DailyQuote {
@@ -104,21 +104,32 @@ class CountdownManager: ObservableObject {
         updateStatusBarText()
     }
 
+    /// Share of today still left, using the real day length (DST days are 23/25h).
+    var percentUntilTomorrow: Double {
+        let cal = Calendar.current, now = Date()
+        let start = cal.startOfDay(for: now)
+        guard let end = cal.date(byAdding: .day, value: 1, to: start) else { return 0 }
+        return end.timeIntervalSince(now) / end.timeIntervalSince(start) * 100
+    }
+
     func updateStatusBarText() {
-        guard let event = selectedEvent else {
-            statusBarText = isVI ? "Không có sự kiện" : "No events"
-            return
-        }
-        let name = event.name
-        switch displayMode {
-        case .percent:
+        let text: String
+        switch (displayMode, selectedEvent) {
+        case (.tomorrow, _):
+            let p = String(format: "%.1f", percentUntilTomorrow)
+            text = isVI ? "\(p)% cho đến ngày mai" : "\(p)% until tomorrow"
+        case (_, nil):
+            text = isVI ? "Không có sự kiện" : "No events"
+        case (.percent, let event?):
             let p = String(format: "%.1f", event.percentLeft)
-            statusBarText = isVI ? "\(p)% cho đến \(name)" : "\(p)% until \(name)"
-        case .days:
-            statusBarText = isVI ? "\(event.daysLeft) ngày cho đến \(name)" : "\(event.daysLeft) days left until \(name)"
-        case .hours:
-            statusBarText = isVI ? "\(event.hoursLeft) giờ cho đến \(name)" : "\(event.hoursLeft) hours left until \(name)"
+            text = isVI ? "\(p)% cho đến \(event.name)" : "\(p)% until \(event.name)"
+        case (.days, let event?):
+            text = isVI ? "\(event.daysLeft) ngày cho đến \(event.name)" : "\(event.daysLeft) days left until \(event.name)"
+        case (.hours, let event?):
+            text = isVI ? "\(event.hoursLeft) giờ cho đến \(event.name)" : "\(event.hoursLeft) hours left until \(event.name)"
         }
+        // Skip identical writes: every @Published set re-renders the popover.
+        if text != statusBarText { statusBarText = text }
     }
 
     func displayModeLabel() -> String {
@@ -126,6 +137,7 @@ class CountdownManager: ObservableObject {
         case .percent: return isVI ? "% Còn Lại" : "% Left"
         case .days: return isVI ? "Chỉ Ngày" : "Days Only"
         case .hours: return isVI ? "Chỉ Giờ" : "Hours Only"
+        case .tomorrow: return isVI ? "% Hôm Nay" : "% Today"
         }
     }
 
@@ -139,9 +151,11 @@ class CountdownManager: ObservableObject {
     func pickDailyQuote() { todaysQuote = quotePool.randomElement()! }
 
     private func startRefreshTimer() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async { self?.updateStatusBarText() }
+        // Nothing in the menu bar changes faster than ~1 min; tolerance lets macOS coalesce wakeups.
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            self?.updateStatusBarText()
         }
+        refreshTimer?.tolerance = 10
         RunLoop.main.add(refreshTimer!, forMode: .common)
     }
 }

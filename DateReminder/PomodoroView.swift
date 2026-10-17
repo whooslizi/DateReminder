@@ -116,7 +116,7 @@ struct PomodoroView: View {
 
             // Skip to next phase
             controlButton(icon: "forward.end.fill", size: 18) {
-                pomodoroManager.reset()
+                pomodoroManager.advance()
             }
         }
     }

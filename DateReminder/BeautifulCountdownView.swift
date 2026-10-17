@@ -23,7 +23,8 @@ struct BeautifulCountdownView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let event = countdownManager.selectedEvent {
-                mainCard(event)
+                // Redraw once a minute only while the popover is on screen.
+                TimelineView(.everyMinute) { _ in mainCard(event) }
             } else {
                 Text(countdownManager.isVI ? "Không có sự kiện" : "No upcoming events")
                     .foregroundColor(.white.opacity(0.6))
@@ -68,29 +69,38 @@ struct BeautifulCountdownView: View {
                 .foregroundColor(.white.opacity(0.5))
                 .padding(.top, 10)
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.white.opacity(0.12))
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(
-                            LinearGradient(colors: [Color(red:0.45, green:0.65, blue:1), Color(red:0.75, green:0.45, blue:1)],
-                                           startPoint: .leading, endPoint: .trailing)
-                        )
-                        .frame(width: geo.size.width * CGFloat(event.percentLeft / 100.0))
-                }
-            }
-            .frame(height: 4)
-            .padding(.horizontal, 32)
-            .padding(.top, 10)
-
+            progressBar(percent: event.percentLeft,
+                        colors: [Color(red:0.45, green:0.65, blue:1), Color(red:0.75, green:0.45, blue:1)])
+                .padding(.top, 12)
             Text(String(format: "%.3f%%", event.percentLeft))
-                .font(.system(size: 11))
+                .font(.system(size: 11, design: .rounded))
                 .foregroundColor(.white.opacity(0.5))
-                .padding(.top, 4)
+                .monospacedDigit()
+
+            let today = countdownManager.percentUntilTomorrow
+            progressBar(percent: today,
+                        colors: [Color(red:1, green:0.75, blue:0.35), Color(red:1, green:0.45, blue:0.45)])
+                .padding(.top, 8)
+            Text(String(format: isVI ? "Hôm nay còn %.1f%%" : "%.1f%% until tomorrow", today))
+                .font(.system(size: 11, design: .rounded))
+                .foregroundColor(.white.opacity(0.5))
+                .monospacedDigit()
                 .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func progressBar(percent: Double, colors: [Color]) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.12))
+                Capsule()
+                    .fill(LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing))
+                    .frame(width: geo.size.width * CGFloat(percent / 100.0))
+            }
+        }
+        .frame(height: 6)
+        .padding(.horizontal, 32)
     }
 
     @ViewBuilder
@@ -155,7 +165,7 @@ struct BeautifulCountdownView: View {
                 HStack {
                     Button(action: { isAddingNew = true }) {
                         Image(systemName: "plus.circle.fill")
-                        Text("Add")
+                        Text(isVI ? "Thêm" : "Add")
                     }
                     
                     Button(action: { countdownManager.deleteSelectedEvent() }) {
