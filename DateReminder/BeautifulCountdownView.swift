@@ -76,15 +76,6 @@ struct BeautifulCountdownView: View {
                 .font(.system(size: 11, design: .rounded))
                 .foregroundColor(.white.opacity(0.5))
                 .monospacedDigit()
-
-            let today = countdownManager.percentUntilTomorrow
-            progressBar(percent: today,
-                        colors: [Color(red:1, green:0.75, blue:0.35), Color(red:1, green:0.45, blue:0.45)])
-                .padding(.top, 8)
-            Text(String(format: isVI ? "Hôm nay còn %.1f%%" : "%.1f%% until tomorrow", today))
-                .font(.system(size: 11, design: .rounded))
-                .foregroundColor(.white.opacity(0.5))
-                .monospacedDigit()
                 .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity)
@@ -119,7 +110,7 @@ struct BeautifulCountdownView: View {
     private var eventPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(countdownManager.events, id: \.id) { event in
+                ForEach(countdownManager.allEvents, id: \.id) { event in
                     let isSelected = countdownManager.selectedEvent?.id == event.id
                     Button {
                         withAnimation { countdownManager.selectEvent(event) }
@@ -170,7 +161,7 @@ struct BeautifulCountdownView: View {
                     
                     Button(action: { countdownManager.deleteSelectedEvent() }) {
                         Image(systemName: "trash.fill")
-                    }.disabled(countdownManager.events.isEmpty)
+                    }.disabled(countdownManager.selectedEvent?.id == CountdownEvent.tomorrowID)
                     
                     Spacer()
                     
@@ -195,6 +186,11 @@ struct BeautifulCountdownView: View {
                     }) {
                         Image(systemName: "bell.badge.fill").foregroundColor(.yellow)
                     }
+
+                    Button(action: { NSApplication.shared.terminate(nil) }) {
+                        Image(systemName: "xmark.circle.fill").foregroundColor(.red.opacity(0.85))
+                    }
+                    .help(isVI ? "Thoát" : "Quit")
                 }
                 .buttonStyle(.plain)
                 .font(.system(size: 12, weight: .semibold))

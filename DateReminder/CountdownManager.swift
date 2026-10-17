@@ -4,7 +4,7 @@
 import SwiftUI
 
 enum DisplayMode: String, CaseIterable, Codable {
-    case percent, days, hours, tomorrow
+    case percent, days, hours
 }
 
 struct DailyQuote {
@@ -14,13 +14,16 @@ struct DailyQuote {
 
 class CountdownManager: ObservableObject {
     @Published var events:        [CountdownEvent] = []
-    @Published var selectedEvent: CountdownEvent?
+    @Published var selectedID:    UUID?            = CountdownEvent.tomorrowID
     @Published var displayMode:   DisplayMode      = .percent
     @Published var statusBarText: String           = "Loading..."
     @Published var todaysQuote:   DailyQuote       = DailyQuote(text: "", author: "")
 
     @Published var currentLanguage: String = UserDefaults.standard.string(forKey: "AppLanguage") ?? "vi"
     var isVI: Bool { currentLanguage == "vi" }
+
+    var allEvents: [CountdownEvent] { [.tomorrow(name: isVI ? "Ngày mai" : "Tomorrow")] + events }
+    var selectedEvent: CountdownEvent? { allEvents.first { $0.id == selectedID } ?? allEvents.first }
 
     private var refreshTimer: Timer?
     private let saveKey = "SavedCountdownEvents"
@@ -59,7 +62,6 @@ class CountdownManager: ObservableObject {
                 CountdownEvent(name: "TSA", date: tsaDate, startDate: Date())
             ]
         }
-        if selectedEvent == nil { selectedEvent = events.first }
     }
 
     func saveEvents() {
@@ -72,17 +74,17 @@ class CountdownManager: ObservableObject {
         let newEvent = CountdownEvent(name: name, date: targetDate, startDate: Date())
         DispatchQueue.main.async {
             self.events.append(newEvent)
-            self.selectedEvent = newEvent
+            self.selectedID = newEvent.id
             self.saveEvents()
             self.updateStatusBarText()
         }
     }
 
     func deleteSelectedEvent() {
-        guard let current = selectedEvent else { return }
+        guard let current = selectedEvent, current.id != CountdownEvent.tomorrowID else { return }
         DispatchQueue.main.async {
             self.events.removeAll { $0.id == current.id }
-            self.selectedEvent = self.events.first
+            self.selectedID = CountdownEvent.tomorrowID
             self.saveEvents()
             self.updateStatusBarText()
         }
@@ -104,20 +106,9 @@ class CountdownManager: ObservableObject {
         updateStatusBarText()
     }
 
-    /// Share of today still left, using the real day length (DST days are 23/25h).
-    var percentUntilTomorrow: Double {
-        let cal = Calendar.current, now = Date()
-        let start = cal.startOfDay(for: now)
-        guard let end = cal.date(byAdding: .day, value: 1, to: start) else { return 0 }
-        return end.timeIntervalSince(now) / end.timeIntervalSince(start) * 100
-    }
-
     func updateStatusBarText() {
         let text: String
         switch (displayMode, selectedEvent) {
-        case (.tomorrow, _):
-            let p = String(format: "%.1f", percentUntilTomorrow)
-            text = isVI ? "\(p)% cho đến ngày mai" : "\(p)% until tomorrow"
         case (_, nil):
             text = isVI ? "Không có sự kiện" : "No events"
         case (.percent, let event?):
@@ -137,13 +128,12 @@ class CountdownManager: ObservableObject {
         case .percent: return isVI ? "% Còn Lại" : "% Left"
         case .days: return isVI ? "Chỉ Ngày" : "Days Only"
         case .hours: return isVI ? "Chỉ Giờ" : "Hours Only"
-        case .tomorrow: return isVI ? "% Hôm Nay" : "% Today"
         }
     }
 
     func selectEvent(_ event: CountdownEvent) {
         DispatchQueue.main.async {
-            self.selectedEvent = event
+            self.selectedID = event.id
             self.updateStatusBarText()
         }
     }
